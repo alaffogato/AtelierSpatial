@@ -1,0 +1,6 @@
+{
+  "name": "Atelier Spatial",
+  "description": "DIY interior design advisor with floor plan upload, Unsplash-powered mood boards, interactive 3D room modeling and walkthroughs, renovation cost estimation, and contractor recommendations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
