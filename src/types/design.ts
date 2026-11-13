@@ -8,6 +8,7 @@ export type DesignStyleId =
   | 'coastal';
 
 export type RoomLayoutPreset =
+  | 'hdb-5-room'
   | 'open-living-dining'
   | 'studio-loft'
   | 'l-shaped-suite'

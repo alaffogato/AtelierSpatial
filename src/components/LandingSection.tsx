@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ArrowRight, Box, Calculator, FileCheck2, Palette, ShieldCheck } from 'lucide-react';
 import { SAMPLE_FLOOR_PLAN_IMAGE } from '../data/styles';
 import { ColorScheme, CostEstimate, RoomConfig, StyleDefinition, UnitSystem } from '../types/design';
@@ -14,6 +14,14 @@ interface LandingSectionProps {
   onOneClickQuote: () => void;
 }
 
+interface UnsplashSingleResponse {
+  configured?: boolean;
+  results?: Array<{
+    urls?: { regular?: string };
+    user?: { name?: string };
+  }>;
+}
+
 export const LandingSection: React.FC<LandingSectionProps> = ({
   room,
   unitSystem,
@@ -23,6 +31,49 @@ export const LandingSection: React.FC<LandingSectionProps> = ({
   onNavigate,
   onOneClickQuote,
 }) => {
+  const [heroSrc, setHeroSrc] = useState<string>(selectedStyle.heroImage);
+  const [heroCredit, setHeroCredit] = useState<string | null>(null);
+  const [heroFailed, setHeroFailed] = useState(false);
+  const [planImgFailed, setPlanImgFailed] = useState(false);
+
+  // Sync bundled hero image when style changes, and enhance with live Unsplash via /api/moodboard if configured
+  useEffect(() => {
+    let active = true;
+    setHeroSrc(selectedStyle.heroImage);
+    setHeroCredit(null);
+    setHeroFailed(false);
+
+    const query = `${selectedStyle.name.toLowerCase()} interior living room`;
+    fetch(`/api/moodboard?query=${encodeURIComponent(query)}&per_page=1`, {
+      headers: { Accept: 'application/json' },
+    })
+      .then(async (res) => {
+        const contentType = res.headers.get('content-type') ?? '';
+        if (!res.ok || !contentType.includes('application/json')) return null;
+        return (await res.json()) as UnsplashSingleResponse;
+      })
+      .then((data) => {
+        if (!active || !data?.configured || !data.results?.length) return;
+        const url = data.results[0]?.urls?.regular;
+        if (url) {
+          setHeroSrc(url);
+          setHeroCredit(data.results[0]?.user?.name ?? 'Unsplash');
+          setHeroFailed(false);
+        }
+      })
+      .catch(() => {
+        // Keep bundled asset on offline/unconfigured environments
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [selectedStyle.id, selectedStyle.heroImage, selectedStyle.name]);
+
+  useEffect(() => {
+    setPlanImgFailed(false);
+  }, [room.floorPlanUrl]);
+
   return (
     <section id="overview" className="pt-10 pb-16 border-b border-[#E6E3DC]">
       <div className="max-w-[1360px] mx-auto px-6">
@@ -84,18 +135,38 @@ export const LandingSection: React.FC<LandingSectionProps> = ({
             </div>
           </div>
 
-          {/* Right Editorial Visual */}
-          <div className="lg:col-span-6 relative rounded-2xl overflow-hidden border border-[#E6E3DC] bg-[#EAE6DD] min-h-[340px]">
-            <img
-              src={selectedStyle.heroImage}
-              alt={`${selectedStyle.name} interior visualisation`}
-              referrerPolicy="no-referrer"
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute inset-x-0 bottom-0 p-5 bg-gradient-to-t from-black/80 via-black/40 to-transparent text-white flex items-end justify-between gap-4">
+          {/* Right Editorial Visual (bundled Japandi image + live Unsplash via /api/moodboard + CSS fallback) */}
+          <div className="lg:col-span-6 relative rounded-2xl overflow-hidden border border-[#E6E3DC] bg-gradient-to-br from-[#EAE3D7] via-[#D8CFC0] to-[#C5B7A1] min-h-[360px]">
+            {!heroFailed ? (
+              <img
+                src={heroSrc}
+                alt={`${selectedStyle.name} inspired interior living room`}
+                referrerPolicy="no-referrer"
+                onError={() => {
+                  if (heroSrc !== selectedStyle.heroImage) {
+                    setHeroSrc(selectedStyle.heroImage);
+                  } else {
+                    setHeroFailed(true);
+                  }
+                }}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center text-[#1A1917]">
+                <Palette className="w-8 h-8 mb-2 text-[#1B4D3E]" />
+                <p className="font-display text-lg font-semibold">
+                  {selectedStyle.name} · {selectedScheme.name}
+                </p>
+                <p className="text-xs text-[#64615B] mt-1">
+                  {selectedStyle.materialSpecs.flooring}
+                </p>
+              </div>
+            )}
+            <div className="absolute inset-x-0 bottom-0 p-5 bg-gradient-to-t from-black/80 via-black/45 to-transparent text-white flex items-end justify-between gap-4">
               <div>
                 <p className="text-xs text-white/80 mb-0.5">
                   Active Workspace Preview · {formatLength(room.widthFt, unitSystem)} × {formatLength(room.lengthFt, unitSystem)} ({formatArea(estimate.areaSqFt, unitSystem)})
+                  {heroCredit ? ` · Unsplash (${heroCredit})` : ''}
                 </p>
                 <p className="font-display text-lg font-semibold">
                   {selectedStyle.name} — {selectedScheme.name}
@@ -151,13 +222,21 @@ export const LandingSection: React.FC<LandingSectionProps> = ({
                 </button>
               </div>
             </div>
-            <div className="sm:w-52 shrink-0 rounded-lg overflow-hidden border border-[#E6E3DC] bg-[#F8F7F4]">
-              <img
-                src={room.floorPlanUrl ?? SAMPLE_FLOOR_PLAN_IMAGE}
-                alt="2D architectural floor plan preview"
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover"
-              />
+            <div className="sm:w-52 shrink-0 rounded-lg overflow-hidden border border-[#E6E3DC] bg-[#F8F7F4] flex items-center justify-center">
+              {!planImgFailed ? (
+                <img
+                  src={room.floorPlanUrl ?? SAMPLE_FLOOR_PLAN_IMAGE}
+                  alt="2D architectural floor plan preview"
+                  referrerPolicy="no-referrer"
+                  onError={() => setPlanImgFailed(true)}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="p-4 text-center text-xs text-[#64615B]">
+                  <Box className="w-6 h-6 mx-auto mb-1 text-[#1B4D3E]" />
+                  <span>2D Floor Plan Ready</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -206,7 +285,7 @@ export const LandingSection: React.FC<LandingSectionProps> = ({
                 Itemized SGD material &amp; trade labor breakdown.
               </h3>
               <p className="text-sm text-[#4B4842] leading-relaxed mb-4">
-                Toggle flooring, plaster painting, EMA electrical rewiring, custom carpentry, and loose furnishings to calculate costs per square foot with a 10% contingency buffer.
+                Toggle flooring, plaster painting, EMA electrical rewiring, custom carpentry, and loose furnishings to calculate costs per square meter with a 10% contingency buffer.
               </p>
             </div>
             <div className="flex items-center justify-between gap-4 pt-3 border-t border-[#EFECE6]">

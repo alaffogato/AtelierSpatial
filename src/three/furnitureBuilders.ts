@@ -550,3 +550,289 @@ export function buildDiningSetGroup(mats: StyleMaterialSet): THREE.Group {
   enableShadows(group);
   return group;
 }
+
+/**
+ * Multi-part Platform Bed Group (Headboard, Mattress, Duvet, Pillows, Nightstand)
+ */
+export function buildBedGroup(mats: StyleMaterialSet, isMaster = true): THREE.Group {
+  const group = new THREE.Group();
+  group.name = isMaster ? 'MasterBedGroup' : 'SingleBedGroup';
+
+  const bedW = isMaster ? 1.58 : 1.04;
+  const bedD = 2.02;
+
+  // Platform timber base + inset plinth
+  const plinth = new THREE.Mesh(new THREE.BoxGeometry(bedW - 0.14, 0.12, bedD - 0.14), mats.wood);
+  plinth.position.set(0, 0.06, 0.02);
+  group.add(plinth);
+
+  const deck = new THREE.Mesh(createRoundedBoxGeometry(bedW + 0.08, 0.12, bedD + 0.06, 0.02), mats.wood);
+  deck.position.set(0, 0.12, 0.02);
+  group.add(deck);
+
+  // Upholstered Headboard
+  const headboard = new THREE.Mesh(createRoundedBoxGeometry(bedW + 0.14, 0.92, 0.1, 0.025), mats.sofa);
+  headboard.position.set(0, 0.18, -bedD / 2 + 0.02);
+  group.add(headboard);
+
+  // Mattress
+  const mattress = new THREE.Mesh(createRoundedBoxGeometry(bedW - 0.02, 0.22, bedD - 0.08, 0.03), mats.ceramic);
+  mattress.position.set(0, 0.24, 0.04);
+  group.add(mattress);
+
+  // Folded Duvet Throw
+  const duvet = new THREE.Mesh(createRoundedBoxGeometry(bedW + 0.02, 0.06, bedD * 0.6, 0.02), mats.accentFabric);
+  duvet.position.set(0, 0.43, bedD * 0.17);
+  group.add(duvet);
+
+  // Pillows
+  const pillowGeo = createRoundedBoxGeometry(isMaster ? 0.56 : 0.62, 0.11, 0.36, 0.03);
+  if (isMaster) {
+    [-0.38, 0.38].forEach((px) => {
+      const p = new THREE.Mesh(pillowGeo, mats.sofa);
+      p.position.set(px, 0.46, -bedD / 2 + 0.3);
+      p.rotation.x = 0.18;
+      group.add(p);
+    });
+  } else {
+    const p = new THREE.Mesh(pillowGeo, mats.sofa);
+    p.position.set(0, 0.46, -bedD / 2 + 0.3);
+    p.rotation.x = 0.18;
+    group.add(p);
+  }
+
+  // Nightstand(s)
+  const standPositions = isMaster ? [-bedW / 2 - 0.32, bedW / 2 + 0.32] : [bedW / 2 + 0.28];
+  for (const sx of standPositions) {
+    const standBody = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.44, 0.38), mats.wood);
+    standBody.position.set(sx, 0.22, -bedD / 2 + 0.24);
+    group.add(standBody);
+
+    const lampBase = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.14, 12), mats.ceramic);
+    lampBase.position.set(sx, 0.51, -bedD / 2 + 0.24);
+    group.add(lampBase);
+
+    const lampShade = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 0.14, 14), mats.shade);
+    lampShade.position.set(sx, 0.64, -bedD / 2 + 0.24);
+    group.add(lampShade);
+  }
+
+  enableShadows(group);
+  return group;
+}
+
+/**
+ * Multi-part Built-In Full-Height Wardrobe Group
+ */
+export function buildWardrobeGroup(
+  mats: StyleMaterialSet,
+  widthM = 1.65,
+  heightM = 2.25,
+): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'WardrobeGroup';
+
+  const depth = 0.58;
+  const carcass = new THREE.Mesh(new THREE.BoxGeometry(widthM, heightM, depth), mats.wood);
+  carcass.position.set(0, heightM / 2, 0);
+  group.add(carcass);
+
+  const panels = Math.max(2, Math.round(widthM / 0.55));
+  const doorW = (widthM - 0.04) / panels;
+  for (let i = 0; i < panels; i++) {
+    const dx = -widthM / 2 + 0.02 + doorW * (i + 0.5);
+    const door = new THREE.Mesh(
+      new THREE.BoxGeometry(doorW - 0.012, heightM - 0.06, 0.02),
+      mats.ceramic,
+    );
+    door.position.set(dx, heightM / 2, depth / 2 + 0.01);
+    group.add(door);
+
+    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.016, 0.36, 0.024), mats.metal);
+    handle.position.set(
+      dx + (i % 2 === 0 ? doorW * 0.34 : -doorW * 0.34),
+      1.12,
+      depth / 2 + 0.026,
+    );
+    group.add(handle);
+  }
+
+  enableShadows(group);
+  return group;
+}
+
+/**
+ * Multi-part HDB Kitchen Counter, Induction Hob, Sink, & Tall Fridge Group
+ */
+export function buildKitchenBlockGroup(mats: StyleMaterialSet, counterLen = 2.9): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'KitchenBlockGroup';
+
+  // Main base cabinet run
+  const baseCab = new THREE.Mesh(new THREE.BoxGeometry(counterLen, 0.84, 0.62), mats.wood);
+  baseCab.position.set(0, 0.42, 0);
+  group.add(baseCab);
+
+  // Quartz countertop
+  const counterTop = new THREE.Mesh(
+    createRoundedBoxGeometry(counterLen + 0.04, 0.045, 0.66, 0.01),
+    mats.stone,
+  );
+  counterTop.position.set(0, 0.84, 0);
+  group.add(counterTop);
+
+  // Upper wall cabinets
+  const upperCab = new THREE.Mesh(new THREE.BoxGeometry(counterLen * 0.72, 0.68, 0.34), mats.ceramic);
+  upperCab.position.set(-counterLen * 0.12, 1.88, -0.14);
+  group.add(upperCab);
+
+  // Induction Cooktop
+  const hob = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.014, 0.44), mats.screen);
+  hob.position.set(-counterLen * 0.24, 0.89, 0.02);
+  group.add(hob);
+
+  // Sink basin + gooseneck faucet
+  const sink = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.02, 0.42), mats.metal);
+  sink.position.set(counterLen * 0.18, 0.888, 0.02);
+  group.add(sink);
+
+  const faucetPost = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.016, 0.26, 10), mats.metal);
+  faucetPost.position.set(counterLen * 0.18, 1.02, -0.16);
+  group.add(faucetPost);
+
+  const faucetSpout = new THREE.Mesh(new THREE.BoxGeometry(0.024, 0.024, 0.16), mats.metal);
+  faucetSpout.position.set(counterLen * 0.18, 1.14, -0.09);
+  group.add(faucetSpout);
+
+  // Tall Refrigerator Volume at right end
+  const fridge = new THREE.Mesh(createRoundedBoxGeometry(0.72, 1.82, 0.66, 0.02), mats.metal);
+  fridge.position.set(counterLen / 2 + 0.42, 0, 0.01);
+  group.add(fridge);
+
+  enableShadows(group);
+  return group;
+}
+
+/**
+ * Multi-part Study Desk, Chair & Lamp Group
+ */
+export function buildStudyDeskGroup(mats: StyleMaterialSet): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'StudyDeskGroup';
+
+  const top = new THREE.Mesh(createRoundedBoxGeometry(1.36, 0.04, 0.62, 0.012), mats.wood);
+  top.position.set(0, 0.72, 0);
+  group.add(top);
+
+  const legGeo = new THREE.CylinderGeometry(0.02, 0.015, 0.72, 8);
+  [
+    [-0.6, -0.24],
+    [0.6, -0.24],
+    [-0.6, 0.24],
+    [0.6, 0.24],
+  ].forEach(([lx, lz]) => {
+    const leg = new THREE.Mesh(legGeo, mats.metal);
+    leg.position.set(lx, 0.36, lz);
+    group.add(leg);
+  });
+
+  // Monitor silhouette
+  const stand = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.14, 0.1), mats.metal);
+  stand.position.set(0, 0.83, -0.14);
+  group.add(stand);
+
+  const monitor = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.34, 0.025), mats.screen);
+  monitor.position.set(0, 1.02, -0.16);
+  group.add(monitor);
+
+  // Task chair tucked in front
+  const cSeat = new THREE.Mesh(createRoundedBoxGeometry(0.46, 0.06, 0.44, 0.02), mats.accentFabric);
+  cSeat.position.set(0, 0.44, 0.46);
+  group.add(cSeat);
+
+  const cBack = new THREE.Mesh(createRoundedBoxGeometry(0.44, 0.42, 0.05, 0.018), mats.accentFabric);
+  cBack.position.set(0, 0.48, 0.66);
+  group.add(cBack);
+
+  const cStem = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.024, 0.42, 10), mats.metal);
+  cStem.position.set(0, 0.22, 0.46);
+  group.add(cStem);
+
+  const cBase = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.24, 0.03, 16), mats.metal);
+  cBase.position.set(0, 0.015, 0.46);
+  group.add(cBase);
+
+  enableShadows(group);
+  return group;
+}
+
+/**
+ * Multi-part Bathroom Vanity, Basin, Mirror, WC & Glass Shower Screen Group
+ */
+export function buildBathroomGroup(mats: StyleMaterialSet, glassMat: THREE.Material): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'BathroomGroup';
+
+  // Floating Vanity
+  const vanity = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.48, 0.44), mats.wood);
+  vanity.position.set(-0.48, 0.56, -0.52);
+  group.add(vanity);
+
+  const basin = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.14, 0.1, 18), mats.ceramic);
+  basin.position.set(-0.48, 0.85, -0.52);
+  group.add(basin);
+
+  const mirror = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.86, 0.025), mats.metal);
+  mirror.position.set(-0.48, 1.48, -0.72);
+  group.add(mirror);
+
+  // Architectural WC
+  const wcBase = new THREE.Mesh(createRoundedBoxGeometry(0.38, 0.38, 0.54, 0.04), mats.ceramic);
+  wcBase.position.set(0.24, 0.01, -0.44);
+  group.add(wcBase);
+
+  const wcTank = new THREE.Mesh(createRoundedBoxGeometry(0.36, 0.36, 0.18, 0.02), mats.ceramic);
+  wcTank.position.set(0.24, 0.38, -0.62);
+  group.add(wcTank);
+
+  // Tempered glass shower partition screen
+  const showerFrame = new THREE.Mesh(new THREE.BoxGeometry(0.03, 2.05, 0.88), mats.metal);
+  showerFrame.position.set(0.56, 1.025, 0.12);
+  group.add(showerFrame);
+
+  const showerGlass = new THREE.Mesh(new THREE.BoxGeometry(0.016, 2.0, 0.84), glassMat);
+  showerGlass.position.set(0.56, 1.02, 0.12);
+  group.add(showerGlass);
+
+  enableShadows(group);
+  return group;
+}
+
+/**
+ * Singapore HDB Household Shelter Steel Blast Door & Vent Assembly
+ */
+export function buildShelterDoorGroup(mats: StyleMaterialSet): THREE.Group {
+  const group = new THREE.Group();
+  group.name = 'ShelterDoorGroup';
+
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(0.96, 2.12, 0.08), mats.metal);
+  frame.position.set(0, 1.06, 0);
+  group.add(frame);
+
+  const doorLeaf = new THREE.Mesh(new THREE.BoxGeometry(0.84, 2.02, 0.05), mats.ceramic);
+  doorLeaf.position.set(0, 1.03, 0.03);
+  group.add(doorLeaf);
+
+  const latch = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.24, 0.06), mats.metal);
+  latch.position.set(0.32, 1.04, 0.07);
+  group.add(latch);
+
+  const ventSleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.05, 18), mats.metal);
+  ventSleeve.rotation.x = Math.PI / 2;
+  ventSleeve.position.set(-0.56, 2.18, 0.02);
+  group.add(ventSleeve);
+
+  enableShadows(group);
+  return group;
+}
+

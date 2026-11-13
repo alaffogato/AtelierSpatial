@@ -11,7 +11,7 @@ import { MoodBoardStage } from './components/MoodBoardStage';
 import { Studio3DViewport } from './components/Studio3DViewport';
 import { EstimatorContractorsStage } from './components/EstimatorContractorsStage';
 import { QuotationModal } from './components/QuotationModal';
-import { DESIGN_STYLES, getStyleById } from './data/styles';
+import { DESIGN_STYLES, SAMPLE_FLOOR_PLAN_IMAGE, getStyleById } from './data/styles';
 import {
   DesignStyleId,
   MoodBoardPhoto,
@@ -23,20 +23,21 @@ import {
   calculateRenovationEstimate,
   DEFAULT_RENOVATION_SCOPE,
 } from './utils/costCalculator';
+import { analyzeFloorPlanImage } from './utils/imageAnalysis';
 
 const INITIAL_ROOM: RoomConfig = {
-  roomName: 'Living & Dining Room',
-  widthFt: 16,
-  lengthFt: 26,
-  heightFt: 9.5,
+  roomName: 'HDB 5-Room Flat (110 m²)',
+  widthFt: 32.15, // 9.8 m
+  lengthFt: 36.75, // 11.2 m
+  heightFt: 8.53, // 2.6 m HDB standard ceiling height
   planVersion: 1,
-  layoutPreset: 'open-living-dining',
+  layoutPreset: 'hdb-5-room',
   windowWall: 'north',
   doorWall: 'south',
-  includePartitionWall: false,
+  includePartitionWall: true,
   includeDiningZone: true,
-  floorPlanName: null,
-  floorPlanUrl: null,
+  floorPlanName: 'HDB_5Room_BTO_Floor_Plan.jpg',
+  floorPlanUrl: SAMPLE_FLOOR_PLAN_IMAGE,
   floorPlanAnalysis: null,
   photos: [],
 };
@@ -131,6 +132,28 @@ export default function App() {
     }
     return () => observer.disconnect();
   }, []);
+
+  // Automatically scan the pre-loaded HDB 5-Room sample floor plan on first mount
+  useEffect(() => {
+    let active = true;
+    if (room.floorPlanUrl && !room.floorPlanAnalysis) {
+      analyzeFloorPlanImage(room.floorPlanUrl, 5.0)
+        .then((analysis) => {
+          if (!active) return;
+          setRoom((prev) =>
+            prev.floorPlanUrl === room.floorPlanUrl && !prev.floorPlanAnalysis
+              ? { ...prev, floorPlanAnalysis: analysis }
+              : prev,
+          );
+        })
+        .catch(() => {
+          // Non-fatal if image canvas read is unavailable
+        });
+    }
+    return () => {
+      active = false;
+    };
+  }, [room.floorPlanUrl, room.floorPlanAnalysis]);
 
   return (
     <div className="min-h-screen bg-[#F8F7F4] text-[#1A1917] flex flex-col">

@@ -34,6 +34,7 @@ interface SpaceUploadStageProps {
 }
 
 const LAYOUT_PRESETS: { id: RoomLayoutPreset; label: string }[] = [
+  { id: 'hdb-5-room', label: 'HDB 5-Room Flat' },
   { id: 'open-living-dining', label: 'Living & Dining' },
   { id: 'studio-loft', label: 'Studio Loft' },
   { id: 'l-shaped-suite', label: 'L-Shaped Suite' },
@@ -52,7 +53,7 @@ export const SpaceUploadStage: React.FC<SpaceUploadStageProps> = ({
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [analyzingPlan, setAnalyzingPlan] = useState(false);
   const [showZoneOverlay, setShowZoneOverlay] = useState(true);
-  const [scaleReferenceMeters, setScaleReferenceMeters] = useState<number>(3.0);
+  const [scaleReferenceMeters, setScaleReferenceMeters] = useState<number>(5.0);
   const [planError, setPlanError] = useState<string | null>(null);
   const [regeneratedBanner, setRegeneratedBanner] = useState<string | null>(null);
   const [dragTarget, setDragTarget] = useState<'plan' | 'photo' | null>(null);
@@ -70,9 +71,11 @@ export const SpaceUploadStage: React.FC<SpaceUploadStageProps> = ({
       const analysis = await analyzeFloorPlanImage(dataUrl, refMeters);
       onChangeRoom((prev) => ({
         ...prev,
+        roomName: fileName.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' '),
         floorPlanUrl: dataUrl,
         floorPlanName: fileName,
         floorPlanAnalysis: analysis,
+        layoutPreset: analysis.hasPartition ? 'l-shaped-suite' : 'open-living-dining',
         widthFt: analysis.suggestedWidthFt,
         lengthFt: analysis.suggestedLengthFt,
         planVersion: prev.planVersion + 1,
@@ -133,18 +136,33 @@ export const SpaceUploadStage: React.FC<SpaceUploadStageProps> = ({
   };
 
   const loadSampleFloorPlan = async () => {
-    await processFloorPlanDataUrl(
-      SAMPLE_FLOOR_PLAN_IMAGE,
-      'Residence_Living_Dining_Plan.jpg',
-      3.0,
-    );
-    onChangeRoom((prev) => ({
-      ...prev,
-      widthFt: 16,
-      lengthFt: 26,
-      heightFt: 9.5,
-      includeDiningZone: true,
-    }));
+    setAnalyzingPlan(true);
+    setPlanError(null);
+    setScaleReferenceMeters(5.0);
+    try {
+      const analysis = await analyzeFloorPlanImage(SAMPLE_FLOOR_PLAN_IMAGE, 5.0);
+      onChangeRoom((prev) => ({
+        ...prev,
+        roomName: 'HDB 5-Room Flat (110 m²)',
+        floorPlanUrl: SAMPLE_FLOOR_PLAN_IMAGE,
+        floorPlanName: 'HDB_5Room_BTO_Floor_Plan.jpg',
+        floorPlanAnalysis: analysis,
+        layoutPreset: 'hdb-5-room',
+        widthFt: 32.15, // 9.8 m
+        lengthFt: 36.75, // 11.2 m
+        heightFt: 8.53, // 2.6 m HDB standard ceiling
+        planVersion: prev.planVersion + 1,
+        includePartitionWall: true,
+        includeDiningZone: true,
+      }));
+      setRegeneratedBanner(
+        `Loaded HDB 5-Room flat plan (${analysis.detectedWalls.length} walls scanned) & regenerated 3D flat model`,
+      );
+    } catch {
+      setPlanError('Could not load the sample HDB 5-Room floor plan.');
+    } finally {
+      setAnalyzingPlan(false);
+    }
   };
 
   const loadSampleRoomPhoto = async () => {
@@ -175,8 +193,8 @@ export const SpaceUploadStage: React.FC<SpaceUploadStageProps> = ({
       field === 'heightFt'
         ? Math.min(14, Math.max(7.8, ftVal))
         : field === 'lengthFt'
-          ? Math.min(36, Math.max(13, ftVal))
-          : Math.min(28, Math.max(11, ftVal));
+          ? Math.min(44, Math.max(13, ftVal))
+          : Math.min(40, Math.max(11, ftVal));
     onChangeRoom((prev) => ({
       ...prev,
       [field]: Number(clamped.toFixed(2)),
@@ -240,7 +258,7 @@ export const SpaceUploadStage: React.FC<SpaceUploadStageProps> = ({
               onClick={loadSampleFloorPlan}
               className="px-4 py-2 text-sm font-medium text-[#1A1917] bg-white border border-[#DCD8CF] hover:bg-[#F1EFE9] rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
-              Load Sample Plan
+              Load HDB 5-Room Plan
             </button>
             <button
               type="button"
@@ -491,7 +509,7 @@ export const SpaceUploadStage: React.FC<SpaceUploadStageProps> = ({
                     <input
                       type="number"
                       min={unitSystem === 'metric' ? 4.0 : 13}
-                      max={unitSystem === 'metric' ? 11.0 : 36}
+                      max={unitSystem === 'metric' ? 13.5 : 44}
                       step={unitSystem === 'metric' ? 0.1 : 0.5}
                       value={displayLength}
                       onChange={(e) => updateDimension('lengthFt', Number(e.target.value))}
@@ -500,7 +518,7 @@ export const SpaceUploadStage: React.FC<SpaceUploadStageProps> = ({
                     <input
                       type="range"
                       min={unitSystem === 'metric' ? 4.0 : 13}
-                      max={unitSystem === 'metric' ? 11.0 : 36}
+                      max={unitSystem === 'metric' ? 13.5 : 44}
                       step={unitSystem === 'metric' ? 0.1 : 0.5}
                       value={displayLength}
                       onChange={(e) => updateDimension('lengthFt', Number(e.target.value))}
@@ -520,7 +538,7 @@ export const SpaceUploadStage: React.FC<SpaceUploadStageProps> = ({
                     <input
                       type="number"
                       min={unitSystem === 'metric' ? 3.4 : 11}
-                      max={unitSystem === 'metric' ? 8.5 : 28}
+                      max={unitSystem === 'metric' ? 12.0 : 40}
                       step={unitSystem === 'metric' ? 0.1 : 0.5}
                       value={displayWidth}
                       onChange={(e) => updateDimension('widthFt', Number(e.target.value))}
@@ -529,7 +547,7 @@ export const SpaceUploadStage: React.FC<SpaceUploadStageProps> = ({
                     <input
                       type="range"
                       min={unitSystem === 'metric' ? 3.4 : 11}
-                      max={unitSystem === 'metric' ? 8.5 : 28}
+                      max={unitSystem === 'metric' ? 12.0 : 40}
                       step={unitSystem === 'metric' ? 0.1 : 0.5}
                       value={displayWidth}
                       onChange={(e) => updateDimension('widthFt', Number(e.target.value))}
@@ -579,9 +597,20 @@ export const SpaceUploadStage: React.FC<SpaceUploadStageProps> = ({
                         onChangeRoom((prev) => ({
                           ...prev,
                           layoutPreset: preset.id,
+                          roomName:
+                            preset.id === 'hdb-5-room'
+                              ? 'HDB 5-Room Flat (110 m²)'
+                              : prev.roomName,
+                          widthFt: preset.id === 'hdb-5-room' ? 32.15 : prev.widthFt,
+                          lengthFt: preset.id === 'hdb-5-room' ? 36.75 : prev.lengthFt,
+                          heightFt: preset.id === 'hdb-5-room' ? 8.53 : prev.heightFt,
+                          planVersion: prev.planVersion + 1,
                           includeDiningZone:
-                            preset.id === 'open-living-dining' || preset.id === 'studio-loft',
-                          includePartitionWall: preset.id === 'l-shaped-suite',
+                            preset.id === 'hdb-5-room' ||
+                            preset.id === 'open-living-dining' ||
+                            preset.id === 'studio-loft',
+                          includePartitionWall:
+                            preset.id === 'hdb-5-room' || preset.id === 'l-shaped-suite',
                         }))
                       }
                       className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${

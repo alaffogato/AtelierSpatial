@@ -1,13 +1,20 @@
 import { StyleDefinition } from '../types/design';
+import sampleFloorPlanImg from '../assets/images/hdb_5room_floor_plan_1794559124047.jpg';
+import sampleRoomBeforeImg from '../assets/images/sample_room_before_1794555193849.jpg';
+import imgJapandi from '../assets/images/style_japandi_living_1794555190359.jpg';
+import imgMidcentury from '../assets/images/style_midcentury_living_1794555190985.jpg';
+import imgScandi from '../assets/images/style_scandi_living_1794555191554.jpg';
+import imgIndustrial from '../assets/images/style_industrial_loft_1794555192204.jpg';
+import imgCoastal from '../assets/images/style_coastal_living_1794555193428.jpg';
 
-export const SAMPLE_FLOOR_PLAN_IMAGE = '/src/assets/images/sample_floor_plan_1794555193480.jpg';
-export const SAMPLE_ROOM_PHOTO_IMAGE = '/src/assets/images/sample_room_before_1794555193849.jpg';
+export const SAMPLE_FLOOR_PLAN_IMAGE = sampleFloorPlanImg;
+export const SAMPLE_ROOM_PHOTO_IMAGE = sampleRoomBeforeImg;
 
-const IMG_JAPANDI = '/src/assets/images/style_japandi_living_1794555190359.jpg';
-const IMG_MIDCENTURY = '/src/assets/images/style_midcentury_living_1794555190985.jpg';
-const IMG_SCANDI = '/src/assets/images/style_scandi_living_1794555191554.jpg';
-const IMG_INDUSTRIAL = '/src/assets/images/style_industrial_loft_1794555192204.jpg';
-const IMG_COASTAL = '/src/assets/images/style_coastal_living_1794555193428.jpg';
+const IMG_JAPANDI = imgJapandi;
+const IMG_MIDCENTURY = imgMidcentury;
+const IMG_SCANDI = imgScandi;
+const IMG_INDUSTRIAL = imgIndustrial;
+const IMG_COASTAL = imgCoastal;
 
 export const DESIGN_STYLES: StyleDefinition[] = [
   {
