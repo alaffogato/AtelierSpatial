@@ -59,6 +59,7 @@ export class RoomSceneEngine {
   private roomWidthM = 7.9;
   private roomLengthM = 4.9;
   private roomHeightM = 2.9;
+  private lastPlanVersion = 0;
 
   private cameraMode: CameraMode = 'orbit';
   private walkYaw = 0;
@@ -495,14 +496,35 @@ export class RoomSceneEngine {
     baseboardE.position.set(halfX - wallThick / 2 - 0.01, 0.055, 0);
     this.roomRoot.add(baseboardE);
 
-    // Optional Interior Partition Wall (detected from uploaded floor plan or toggled)
+    // Interior Partition Walls (scanned from floor plan wall segments or manual toggle)
     if (room.includePartitionWall) {
-      const partW = Math.min(2.1, this.roomLengthM * 0.42);
-      const partition = new THREE.Mesh(new THREE.BoxGeometry(0.14, heightM, partW), accentWallMat);
-      partition.position.set(this.roomWidthM * 0.12, heightM / 2, -halfZ + partW / 2 + 0.07);
-      partition.castShadow = true;
-      partition.receiveShadow = true;
-      this.roomRoot.add(partition);
+      const scannedSegments = room.floorPlanAnalysis?.detectedWalls ?? [];
+      if (scannedSegments.length > 0) {
+        for (const seg of scannedSegments) {
+          const sx1 = (seg.x1 - 0.5) * this.roomWidthM;
+          const sz1 = (seg.y1 - 0.5) * this.roomLengthM;
+          const sx2 = (seg.x2 - 0.5) * this.roomWidthM;
+          const sz2 = (seg.y2 - 0.5) * this.roomLengthM;
+          const len = Math.max(0.6, Math.hypot(sx2 - sx1, sz2 - sz1));
+          const angle = Math.atan2(sz2 - sz1, sx2 - sx1);
+          const partWall = new THREE.Mesh(
+            new THREE.BoxGeometry(len, heightM, wallThick),
+            accentWallMat,
+          );
+          partWall.position.set((sx1 + sx2) / 2, heightM / 2, (sz1 + sz2) / 2);
+          partWall.rotation.y = -angle;
+          partWall.castShadow = true;
+          partWall.receiveShadow = true;
+          this.roomRoot.add(partWall);
+        }
+      } else {
+        const partW = Math.min(2.1, this.roomLengthM * 0.42);
+        const partition = new THREE.Mesh(new THREE.BoxGeometry(0.14, heightM, partW), accentWallMat);
+        partition.position.set(this.roomWidthM * 0.12, heightM / 2, -halfZ + partW / 2 + 0.07);
+        partition.castShadow = true;
+        partition.receiveShadow = true;
+        this.roomRoot.add(partition);
+      }
     }
 
     // Ceiling (shown only in first-person Walkthrough mode so Orbit views remain open)
@@ -565,7 +587,15 @@ export class RoomSceneEngine {
 
     this.trackObjectResources(this.roomRoot);
     this.applyLightingMood(lightingMood);
-    this.requestRender();
+
+    if (room.planVersion !== this.lastPlanVersion) {
+      this.lastPlanVersion = room.planVersion;
+      if (this.cameraMode === 'orbit') {
+        this.setCameraPreset('isometric');
+      }
+    } else {
+      this.requestRender();
+    }
   }
 
   public applyLightingMood(mood: LightingMood) {

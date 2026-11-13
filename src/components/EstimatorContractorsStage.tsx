@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Check, ExternalLink, Star } from 'lucide-react';
+import { Check, ExternalLink, FileCheck2, Star } from 'lucide-react';
 import { CONTRACTORS_DIRECTORY } from '../data/contractors';
 import {
   ColorScheme,
@@ -8,10 +8,13 @@ import {
   RenovationScopeItem,
   RoomConfig,
   StyleDefinition,
+  UnitSystem,
 } from '../types/design';
+import { formatArea, formatCostPerArea, formatLength } from '../utils/units';
 
 interface EstimatorContractorsStageProps {
   room: RoomConfig;
+  unitSystem: UnitSystem;
   selectedStyle: StyleDefinition;
   selectedScheme: ColorScheme;
   scopeItems: RenovationScopeItem[];
@@ -19,6 +22,7 @@ interface EstimatorContractorsStageProps {
   shortlistedContractorIds: string[];
   onToggleScopeItem: (id: string) => void;
   onToggleShortlist: (id: string) => void;
+  onOneClickQuote: () => void;
 }
 
 const SPECIALTY_FILTERS: Array<'All' | ContractorProfile['specialty']> = [
@@ -29,16 +33,13 @@ const SPECIALTY_FILTERS: Array<'All' | ContractorProfile['specialty']> = [
   'Electrical & Lighting',
 ];
 
-function formatCurrency(val: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(val);
+function formatSGD(val: number): string {
+  return `S$${Math.round(val).toLocaleString('en-SG')}`;
 }
 
 export const EstimatorContractorsStage: React.FC<EstimatorContractorsStageProps> = ({
   room,
+  unitSystem,
   selectedStyle,
   selectedScheme,
   scopeItems,
@@ -46,6 +47,7 @@ export const EstimatorContractorsStage: React.FC<EstimatorContractorsStageProps>
   shortlistedContractorIds,
   onToggleScopeItem,
   onToggleShortlist,
+  onOneClickQuote,
 }) => {
   const [specialtyFilter, setSpecialtyFilter] = useState<'All' | ContractorProfile['specialty']>('All');
 
@@ -55,7 +57,7 @@ export const EstimatorContractorsStage: React.FC<EstimatorContractorsStageProps>
         ? CONTRACTORS_DIRECTORY
         : CONTRACTORS_DIRECTORY.filter((c) => c.specialty === specialtyFilter);
 
-    // Sort style-matched contractors first
+    // Sort style-matched Singapore contractors first
     return [...base].sort((a, b) => {
       const aMatch = a.recommendedFor.includes(selectedStyle.id) ? 1 : 0;
       const bMatch = b.recommendedFor.includes(selectedStyle.id) ? 1 : 0;
@@ -70,20 +72,30 @@ export const EstimatorContractorsStage: React.FC<EstimatorContractorsStageProps>
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-10">
           <div className="max-w-2xl">
             <p className="text-xs font-medium tracking-wide text-[#64615B] mb-2">
-              04. Renovation Cost Estimate &amp; Recommended Contractors
+              04. Singapore Renovation Budget &amp; Contractor Recommendations
             </p>
             <h2 className="font-display text-2xl sm:text-3xl font-semibold tracking-tight text-[#1A1917] [text-wrap:balance]">
-              Itemized renovation budget for {estimate.areaSqFt} sq ft in {selectedStyle.name}.
+              Itemized SGD renovation estimate for {formatArea(estimate.areaSqFt, unitSystem)} in {selectedStyle.name}.
             </h2>
           </div>
 
-          <div className="bg-white border border-[#E6E3DC] rounded-xl px-5 py-3.5 shrink-0">
-            <p className="text-xs text-[#64615B] mb-0.5">
-              Estimated Project Range (incl. 10% contingency)
-            </p>
-            <p className="font-display text-2xl font-bold font-mono tabular-nums text-[#1A1917]">
-              {formatCurrency(estimate.estimatedLow)} – {formatCurrency(estimate.estimatedHigh)}
-            </p>
+          <div className="flex flex-wrap items-center gap-4 shrink-0">
+            <div className="bg-white border border-[#E6E3DC] rounded-xl px-5 py-3">
+              <p className="text-xs text-[#64615B] mb-0.5">
+                Estimated Budget (incl. 10% contingency)
+              </p>
+              <p className="font-display text-xl font-bold font-mono tabular-nums text-[#1A1917]">
+                {formatSGD(estimate.estimatedLow)} – {formatSGD(estimate.estimatedHigh)}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onOneClickQuote}
+              className="inline-flex items-center gap-2 px-5 py-3.5 text-sm font-medium text-white bg-[#1B4D3E] hover:bg-[#153D31] rounded-xl transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              <FileCheck2 className="w-4 h-4" />
+              1-Click Get Quotations
+            </button>
           </div>
         </div>
 
@@ -95,7 +107,7 @@ export const EstimatorContractorsStage: React.FC<EstimatorContractorsStageProps>
               Renovation Scope
             </h3>
             <p className="text-xs text-[#64615B] mb-4">
-              Toggle work packages to recalculate materials and trade labor for {room.widthFt}′ × {room.lengthFt}′.
+              Toggle work packages to recalculate Singapore material and labor costs for {formatLength(room.widthFt, unitSystem)} × {formatLength(room.lengthFt, unitSystem)}.
             </p>
 
             <div className="divide-y divide-[#EFECE6]">
@@ -124,12 +136,12 @@ export const EstimatorContractorsStage: React.FC<EstimatorContractorsStageProps>
             <div className="px-6 py-4 border-b border-[#E6E3DC] flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h3 className="font-display text-base font-semibold text-[#1A1917]">
-                  Itemized Budget Breakdown
+                  Itemized SGD Budget Breakdown
                 </h3>
                 <p className="text-xs text-[#64615B]">
                   {selectedStyle.name} · {selectedScheme.name} ·{' '}
                   <span className="font-mono tabular-nums">
-                    ~{formatCurrency(estimate.costPerSqFt)}/sq ft
+                    ~{formatCostPerArea(estimate.costPerSqFt, unitSystem)}
                   </span>
                 </p>
               </div>
@@ -165,13 +177,13 @@ export const EstimatorContractorsStage: React.FC<EstimatorContractorsStageProps>
                           {row.quantityLabel}
                         </td>
                         <td className="py-3.5 px-3 text-right font-mono tabular-nums text-[#1A1917]">
-                          {formatCurrency(row.materialCost)}
+                          {formatSGD(row.materialCost)}
                         </td>
                         <td className="py-3.5 px-3 text-right font-mono tabular-nums text-[#1A1917]">
-                          {formatCurrency(row.laborCost)}
+                          {formatSGD(row.laborCost)}
                         </td>
                         <td className="py-3.5 px-6 text-right font-mono tabular-nums font-semibold text-[#1A1917]">
-                          {formatCurrency(row.totalCost)}
+                          {formatSGD(row.totalCost)}
                         </td>
                       </tr>
                     ))}
@@ -182,13 +194,13 @@ export const EstimatorContractorsStage: React.FC<EstimatorContractorsStageProps>
                         Subtotal (Materials + Labor)
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono tabular-nums text-[#1A1917]">
-                        {formatCurrency(estimate.materialsTotal)}
+                        {formatSGD(estimate.materialsTotal)}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono tabular-nums text-[#1A1917]">
-                        {formatCurrency(estimate.laborTotal)}
+                        {formatSGD(estimate.laborTotal)}
                       </td>
                       <td className="py-2.5 px-6 text-right font-mono tabular-nums font-medium text-[#1A1917]">
-                        {formatCurrency(estimate.subtotal)}
+                        {formatSGD(estimate.subtotal)}
                       </td>
                     </tr>
                     <tr>
@@ -196,15 +208,15 @@ export const EstimatorContractorsStage: React.FC<EstimatorContractorsStageProps>
                         Recommended 10% Renovation Contingency
                       </td>
                       <td className="py-2 px-6 text-right font-mono tabular-nums text-xs text-[#64615B]">
-                        {formatCurrency(estimate.contingency)}
+                        {formatSGD(estimate.contingency)}
                       </td>
                     </tr>
                     <tr className="border-t border-[#DCD8CF]">
                       <td colSpan={4} className="py-3.5 px-6 font-display font-semibold text-[#1A1917]">
-                        Total Estimated Budget
+                        Total Estimated Budget (SGD)
                       </td>
                       <td className="py-3.5 px-6 text-right font-mono tabular-nums font-bold text-base text-[#1B4D3E]">
-                        {formatCurrency(estimate.subtotal + estimate.contingency)}
+                        {formatSGD(estimate.subtotal + estimate.contingency)}
                       </td>
                     </tr>
                   </tfoot>
@@ -214,15 +226,15 @@ export const EstimatorContractorsStage: React.FC<EstimatorContractorsStageProps>
           </div>
         </div>
 
-        {/* Recommended Renovation Contractors */}
+        {/* Recommended Singapore Renovation Contractors */}
         <div>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
             <div>
               <h3 className="font-display text-xl font-semibold text-[#1A1917]">
-                Recommended Renovation Contractors
+                Recommended Singapore Renovation Contractors
               </h3>
               <p className="text-sm text-[#64615B]">
-                Vetted trade specialists &amp; verified directories matched to {selectedStyle.name}
+                HDB-registered, BCA-licensed &amp; CaseTrust firms matched to {selectedStyle.name}
               </p>
             </div>
 

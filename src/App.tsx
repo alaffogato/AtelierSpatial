@@ -5,17 +5,19 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { TopBar } from './components/TopBar';
+import { LandingSection } from './components/LandingSection';
 import { SpaceUploadStage } from './components/SpaceUploadStage';
 import { MoodBoardStage } from './components/MoodBoardStage';
 import { Studio3DViewport } from './components/Studio3DViewport';
 import { EstimatorContractorsStage } from './components/EstimatorContractorsStage';
-import { ExportBriefModal } from './components/ExportBriefModal';
+import { QuotationModal } from './components/QuotationModal';
 import { DESIGN_STYLES, getStyleById } from './data/styles';
 import {
   DesignStyleId,
   MoodBoardPhoto,
   RenovationScopeItem,
   RoomConfig,
+  UnitSystem,
 } from './types/design';
 import {
   calculateRenovationEstimate,
@@ -27,6 +29,7 @@ const INITIAL_ROOM: RoomConfig = {
   widthFt: 16,
   lengthFt: 26,
   heightFt: 9.5,
+  planVersion: 1,
   layoutPreset: 'open-living-dining',
   windowWall: 'north',
   doorWall: 'south',
@@ -39,7 +42,8 @@ const INITIAL_ROOM: RoomConfig = {
 };
 
 export default function App() {
-  const [activeSection, setActiveSection] = useState<string>('space');
+  const [activeSection, setActiveSection] = useState<string>('overview');
+  const [unitSystem, setUnitSystem] = useState<UnitSystem>('metric');
   const [room, setRoom] = useState<RoomConfig>(INITIAL_ROOM);
   const [selectedStyleId, setSelectedStyleId] = useState<DesignStyleId>('japandi');
   const [selectedSchemeId, setSelectedSchemeId] = useState<string>(
@@ -52,9 +56,9 @@ export default function App() {
     DEFAULT_RENOVATION_SCOPE,
   );
   const [shortlistedContractorIds, setShortlistedContractorIds] = useState<string[]>([
-    'nordic-craft',
+    'kobo-sg',
   ]);
-  const [exportOpen, setExportOpen] = useState(false);
+  const [quoteModalOpen, setQuoteModalOpen] = useState(false);
 
   const selectedStyle = useMemo(
     () => getStyleById(selectedStyleId),
@@ -69,8 +73,8 @@ export default function App() {
   );
 
   const estimate = useMemo(
-    () => calculateRenovationEstimate(room, selectedStyle, scopeItems),
-    [room, selectedStyle, scopeItems],
+    () => calculateRenovationEstimate(room, selectedStyle, scopeItems, unitSystem),
+    [room, selectedStyle, scopeItems, unitSystem],
   );
 
   const handleSelectStyle = (styleId: DesignStyleId) => {
@@ -109,9 +113,8 @@ export default function App() {
     }
   };
 
-  // Track visible section on scroll for clean top-bar active underline
   useEffect(() => {
-    const ids = ['space', 'moodboard', 'studio3d', 'estimate'];
+    const ids = ['overview', 'space', 'moodboard', 'studio3d', 'estimate'];
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
@@ -134,14 +137,27 @@ export default function App() {
       <TopBar
         activeSection={activeSection}
         onNavigate={navigateToSection}
-        onOpenExport={() => setExportOpen(true)}
+        onOpenQuotation={() => setQuoteModalOpen(true)}
       />
 
       <main className="flex-1">
+        <LandingSection
+          room={room}
+          unitSystem={unitSystem}
+          selectedStyle={selectedStyle}
+          selectedScheme={selectedScheme}
+          estimate={estimate}
+          onNavigate={navigateToSection}
+          onOneClickQuote={() => setQuoteModalOpen(true)}
+        />
+
         <SpaceUploadStage
           room={room}
+          unitSystem={unitSystem}
+          onChangeUnitSystem={setUnitSystem}
           onChangeRoom={setRoom}
           onContinueToMoodBoard={() => navigateToSection('moodboard')}
+          onJumpTo3D={() => navigateToSection('studio3d')}
         />
 
         <MoodBoardStage
@@ -156,6 +172,7 @@ export default function App() {
 
         <Studio3DViewport
           room={room}
+          unitSystem={unitSystem}
           selectedStyle={selectedStyle}
           selectedScheme={selectedScheme}
           onSelectStyle={handleSelectStyle}
@@ -163,6 +180,7 @@ export default function App() {
 
         <EstimatorContractorsStage
           room={room}
+          unitSystem={unitSystem}
           selectedStyle={selectedStyle}
           selectedScheme={selectedScheme}
           scopeItems={scopeItems}
@@ -170,37 +188,39 @@ export default function App() {
           shortlistedContractorIds={shortlistedContractorIds}
           onToggleScopeItem={handleToggleScopeItem}
           onToggleShortlist={handleToggleShortlist}
+          onOneClickQuote={() => setQuoteModalOpen(true)}
         />
       </main>
 
       <footer className="border-t border-[#E6E3DC] bg-white py-8">
         <div className="max-w-[1360px] mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#64615B]">
           <p>
-            Atelier Spatial · Client-side DIY interior planning studio (ready for serverless API integration)
+            Atelier Spatial · Singapore DIY Interior Design &amp; Renovation Planning Studio
           </p>
           <div className="flex items-center gap-6">
             <button
               type="button"
-              onClick={() => navigateToSection('space')}
+              onClick={() => navigateToSection('overview')}
               className="hover:text-[#1A1917] cursor-pointer"
             >
               Back to Top
             </button>
             <button
               type="button"
-              onClick={() => setExportOpen(true)}
+              onClick={() => setQuoteModalOpen(true)}
               className="font-medium text-[#1A1917] hover:underline cursor-pointer"
             >
-              Export Project Brief
+              1-Click Get Quotations
             </button>
           </div>
         </div>
       </footer>
 
-      <ExportBriefModal
-        open={exportOpen}
-        onClose={() => setExportOpen(false)}
+      <QuotationModal
+        open={quoteModalOpen}
+        onClose={() => setQuoteModalOpen(false)}
         room={room}
+        unitSystem={unitSystem}
         style={selectedStyle}
         scheme={selectedScheme}
         pinnedPhotos={pinnedPhotos}

@@ -25,10 +25,13 @@ import {
   LightingMood,
   RoomConfig,
   StyleDefinition,
+  UnitSystem,
 } from '../types/design';
+import { formatLength } from '../utils/units';
 
 interface Studio3DViewportProps {
   room: RoomConfig;
+  unitSystem: UnitSystem;
   selectedStyle: StyleDefinition;
   selectedScheme: ColorScheme;
   onSelectStyle: (styleId: DesignStyleId) => void;
@@ -36,6 +39,7 @@ interface Studio3DViewportProps {
 
 export const Studio3DViewport: React.FC<Studio3DViewportProps> = ({
   room,
+  unitSystem,
   selectedStyle,
   selectedScheme,
   onSelectStyle,
@@ -121,7 +125,7 @@ export const Studio3DViewport: React.FC<Studio3DViewportProps> = ({
             </h2>
           </div>
           <p className="text-xs text-[#64615B] font-mono tabular-nums">
-            {room.widthFt}′ × {room.lengthFt}′ × {room.heightFt}′ · {selectedStyle.name}
+            {formatLength(room.widthFt, unitSystem)} × {formatLength(room.lengthFt, unitSystem)} × {formatLength(room.heightFt, unitSystem)} · {selectedStyle.name}
           </p>
         </div>
 

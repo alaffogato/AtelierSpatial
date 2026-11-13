@@ -4,58 +4,60 @@ import {
   RenovationScopeItem,
   RoomConfig,
   StyleDefinition,
+  UnitSystem,
 } from '../types/design';
+import { formatArea, formatLength } from './units';
 
 export const DEFAULT_RENOVATION_SCOPE: RenovationScopeItem[] = [
   {
     id: 'flooring',
-    label: 'Hardwood / Slab Flooring Replacement',
+    label: 'Flooring Overlay / Vinyl & Timber Installation',
     category: 'Surfaces',
-    description: 'Subfloor leveling, acoustic underlayment, and style-matched plank or microcement install.',
+    description: 'Floor screeding, acoustic underlayment, and style-matched engineered wood, vinyl, or microcement.',
     enabled: true,
     unitType: 'sqft',
-    materialRate: 9.5,
-    laborRate: 6.25,
+    materialRate: 11.5,
+    laborRate: 7.5,
   },
   {
     id: 'walls',
-    label: 'Wall Prep, Skim-Coat & Mineral Finish',
+    label: 'Wall Skim-Coat, Plaster & Anti-Mold Paint',
     category: 'Surfaces',
-    description: 'Drywall patching, primer, and two-coat matte paint or breathable mineral limewash.',
+    description: 'Masonry patching, primer, and two-coat low-VOC paint or breathable mineral limewash finish.',
     enabled: true,
     unitType: 'perimeter-ft',
-    materialRate: 14,
-    laborRate: 26,
+    materialRate: 16,
+    laborRate: 28,
   },
   {
     id: 'lighting',
-    label: 'Architectural Lighting & Dimmer Package',
+    label: 'EMA Electrical Rewiring & Lighting Package',
     category: 'Systems',
-    description: 'Trimless recessed LED downlights, statement floor/pendant fixtures, and smart dimmers.',
+    description: 'Concealed trunking, recessed LED downlights, statement pendant/floor lamp points, and switches.',
     enabled: true,
     unitType: 'fixed',
-    materialRate: 1450,
-    laborRate: 1150,
+    materialRate: 1650,
+    laborRate: 1350,
   },
   {
     id: 'millwork',
-    label: 'Baseboards, Trim & Built-in Credenza',
+    label: 'Custom Carpentry, Skirting & TV Credenza',
     category: 'Millwork',
-    description: 'Flush architectural baseboards, window casing refresh, and custom timber console joinery.',
+    description: 'Moisture-resistant plywood carpentry, flush timber skirting, and built-in media console.',
     enabled: true,
     unitType: 'perimeter-ft',
-    materialRate: 22,
-    laborRate: 18,
+    materialRate: 28,
+    laborRate: 22,
   },
   {
     id: 'furnishings',
-    label: 'Curated Furniture, Rug & Drapery Package',
+    label: 'Sofa, Rug, Drapery & Loose Furnishings',
     category: 'Furnishings',
-    description: 'Primary sofa, coffee table, lounge chair, woven area rug, sheer linen drapery, and botanicals.',
+    description: 'Primary sofa, coffee table, lounge chair, woven area rug, sheer linen curtains, and indoor plant.',
     enabled: true,
     unitType: 'fixed',
-    materialRate: 5800,
-    laborRate: 450,
+    materialRate: 6200,
+    laborRate: 480,
   },
 ];
 
@@ -63,6 +65,7 @@ export function calculateRenovationEstimate(
   room: RoomConfig,
   style: StyleDefinition,
   scopeItems: RenovationScopeItem[],
+  unitSystem: UnitSystem = 'metric',
 ): CostEstimate {
   const areaSqFt = Math.round(room.widthFt * room.lengthFt);
   const perimeterFt = Math.round(2 * (room.widthFt + room.lengthFt));
@@ -78,10 +81,10 @@ export function calculateRenovationEstimate(
 
     if (item.unitType === 'sqft') {
       quantity = areaSqFt;
-      quantityLabel = `${areaSqFt.toLocaleString()} sq ft`;
+      quantityLabel = formatArea(areaSqFt, unitSystem);
     } else if (item.unitType === 'perimeter-ft') {
       quantity = perimeterFt;
-      quantityLabel = `${perimeterFt.toLocaleString()} lin ft`;
+      quantityLabel = formatLength(perimeterFt, unitSystem);
     }
 
     const materialCost = Math.round(quantity * item.materialRate * multiplier);

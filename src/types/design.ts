@@ -1,3 +1,5 @@
+export type UnitSystem = 'metric' | 'imperial';
+
 export type DesignStyleId =
   | 'japandi'
   | 'midcentury'
@@ -39,14 +41,40 @@ export interface UploadedSpacePhoto {
   height: number;
 }
 
+export interface DetectedWallSegment {
+  /** Normalized coordinates (0..1) inside the detected room perimeter */
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  thicknessNorm: number;
+}
+
+export interface NormalizedBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface FloorPlanAnalysis {
   aspectRatio: number;
   wallDensity: number;
   suggestedWidthFt: number;
   suggestedLengthFt: number;
+  suggestedWidthM: number;
+  suggestedLengthM: number;
+  scaleBarDetected: boolean;
+  scaleBarBounds: NormalizedBox | null;
+  scaleBarPx: number | null;
+  scaleReferenceMeters: number;
+  pixelsPerMeter: number;
+  scaleLabel: string;
+  wallBounds: NormalizedBox;
+  detectedWalls: DetectedWallSegment[];
   hasPartition: boolean;
   openingsDetected: number;
-  zoneGrid: number[][]; // 8x6 normalized occupancy map from canvas scan
+  zoneGrid: number[][]; // 12x9 normalized wall ink occupancy map
 }
 
 export interface RoomConfig {
@@ -54,6 +82,7 @@ export interface RoomConfig {
   widthFt: number;
   lengthFt: number;
   heightFt: number;
+  planVersion: number;
   layoutPreset: RoomLayoutPreset;
   windowWall: WallDirection;
   doorWall: 'south' | 'west' | 'east';

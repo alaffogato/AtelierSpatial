@@ -1,13 +1,36 @@
 import React, { useRef, useState } from 'react';
-import { Upload, ImagePlus, Trash2, Layers, Check, ArrowRight } from 'lucide-react';
-import { RoomConfig, RoomLayoutPreset, UploadedSpacePhoto } from '../types/design';
+import {
+  ArrowRight,
+  Box,
+  Check,
+  ImagePlus,
+  Layers,
+  Ruler,
+  Trash2,
+  Upload,
+} from 'lucide-react';
 import { SAMPLE_FLOOR_PLAN_IMAGE, SAMPLE_ROOM_PHOTO_IMAGE } from '../data/styles';
+import {
+  RoomConfig,
+  RoomLayoutPreset,
+  UnitSystem,
+  UploadedSpacePhoto,
+} from '../types/design';
 import { analyzeFloorPlanImage, extractDominantColors } from '../utils/imageAnalysis';
+import {
+  FT_TO_M,
+  M_TO_FT,
+  formatArea,
+  formatLength,
+} from '../utils/units';
 
 interface SpaceUploadStageProps {
   room: RoomConfig;
+  unitSystem: UnitSystem;
+  onChangeUnitSystem: (unit: UnitSystem) => void;
   onChangeRoom: (updater: (prev: RoomConfig) => RoomConfig) => void;
   onContinueToMoodBoard: () => void;
+  onJumpTo3D: () => void;
 }
 
 const LAYOUT_PRESETS: { id: RoomLayoutPreset; label: string }[] = [
@@ -19,23 +42,32 @@ const LAYOUT_PRESETS: { id: RoomLayoutPreset; label: string }[] = [
 
 export const SpaceUploadStage: React.FC<SpaceUploadStageProps> = ({
   room,
+  unitSystem,
+  onChangeUnitSystem,
   onChangeRoom,
   onContinueToMoodBoard,
+  onJumpTo3D,
 }) => {
   const floorPlanInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [analyzingPlan, setAnalyzingPlan] = useState(false);
   const [showZoneOverlay, setShowZoneOverlay] = useState(true);
+  const [scaleReferenceMeters, setScaleReferenceMeters] = useState<number>(3.0);
   const [planError, setPlanError] = useState<string | null>(null);
+  const [regeneratedBanner, setRegeneratedBanner] = useState<string | null>(null);
   const [dragTarget, setDragTarget] = useState<'plan' | 'photo' | null>(null);
 
-  const areaSqFt = Math.round(room.widthFt * room.lengthFt);
+  const areaSqFt = room.widthFt * room.lengthFt;
 
-  const processFloorPlanDataUrl = async (dataUrl: string, fileName: string) => {
+  const processFloorPlanDataUrl = async (
+    dataUrl: string,
+    fileName: string,
+    refMeters = scaleReferenceMeters,
+  ) => {
     setAnalyzingPlan(true);
     setPlanError(null);
     try {
-      const analysis = await analyzeFloorPlanImage(dataUrl);
+      const analysis = await analyzeFloorPlanImage(dataUrl, refMeters);
       onChangeRoom((prev) => ({
         ...prev,
         floorPlanUrl: dataUrl,
@@ -43,9 +75,13 @@ export const SpaceUploadStage: React.FC<SpaceUploadStageProps> = ({
         floorPlanAnalysis: analysis,
         widthFt: analysis.suggestedWidthFt,
         lengthFt: analysis.suggestedLengthFt,
+        planVersion: prev.planVersion + 1,
         includePartitionWall: analysis.hasPartition,
-        includeDiningZone: analysis.suggestedLengthFt >= 20,
+        includeDiningZone: analysis.suggestedLengthM >= 6.0,
       }));
+      setRegeneratedBanner(
+        `Scanned ${analysis.detectedWalls.length} interior wall${analysis.detectedWalls.length === 1 ? '' : 's'} & regenerated 3D model`,
+      );
     } catch {
       setPlanError('Could not read that floor plan image. Try a PNG or JPG file.');
     } finally {
@@ -97,7 +133,11 @@ export const SpaceUploadStage: React.FC<SpaceUploadStageProps> = ({
   };
 
   const loadSampleFloorPlan = async () => {
-    await processFloorPlanDataUrl(SAMPLE_FLOOR_PLAN_IMAGE, 'Residence_Living_Dining_26x16.jpg');
+    await processFloorPlanDataUrl(
+      SAMPLE_FLOOR_PLAN_IMAGE,
+      'Residence_Living_Dining_Plan.jpg',
+      3.0,
+    );
     onChangeRoom((prev) => ({
       ...prev,
       widthFt: 16,
@@ -123,20 +163,78 @@ export const SpaceUploadStage: React.FC<SpaceUploadStageProps> = ({
     }));
   };
 
+  // Helpers to display and edit dimensions in either Metric (m) or Imperial (ft)
+  const displayLength = unitSystem === 'metric' ? Number((room.lengthFt * FT_TO_M).toFixed(1)) : Number(room.lengthFt.toFixed(1));
+  const displayWidth = unitSystem === 'metric' ? Number((room.widthFt * FT_TO_M).toFixed(1)) : Number(room.widthFt.toFixed(1));
+  const displayHeight = unitSystem === 'metric' ? Number((room.heightFt * FT_TO_M).toFixed(1)) : Number(room.heightFt.toFixed(1));
+
+  const updateDimension = (field: 'lengthFt' | 'widthFt' | 'heightFt', rawValue: number) => {
+    if (!Number.isFinite(rawValue)) return;
+    const ftVal = unitSystem === 'metric' ? rawValue * M_TO_FT : rawValue;
+    const clamped =
+      field === 'heightFt'
+        ? Math.min(14, Math.max(7.8, ftVal))
+        : field === 'lengthFt'
+          ? Math.min(36, Math.max(13, ftVal))
+          : Math.min(28, Math.max(11, ftVal));
+    onChangeRoom((prev) => ({
+      ...prev,
+      [field]: Number(clamped.toFixed(2)),
+    }));
+  };
+
+  const handleRecalibrateScaleBar = async (newRefMeters: number) => {
+    setScaleReferenceMeters(newRefMeters);
+    if (room.floorPlanUrl && room.floorPlanName) {
+      await processFloorPlanDataUrl(room.floorPlanUrl, room.floorPlanName, newRefMeters);
+    }
+  };
+
   return (
-    <section id="space" className="pt-10 pb-14 border-b border-[#E6E3DC]">
+    <section id="space" className="py-14 border-b border-[#E6E3DC]">
       <div className="max-w-[1360px] mx-auto px-6">
         {/* Editorial Header */}
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 mb-10">
           <div className="max-w-2xl">
             <p className="text-xs font-medium tracking-wide text-[#64615B] mb-2">
-              01. Space Capture & Spatial Calibration
+              01. Floor Plan Scanner &amp; Spatial Calibration
             </p>
-            <h1 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight text-[#1A1917] leading-tight [text-wrap:balance]">
-              Upload your floor plan and space photos to generate an editable 3D room.
-            </h1>
+            <h2 className="font-display text-2xl sm:text-3xl font-semibold tracking-tight text-[#1A1917] leading-tight [text-wrap:balance]">
+              Upload your floor plan and photos to scan walls, detect scale, and generate the 3D room.
+            </h2>
           </div>
+
           <div className="flex flex-wrap items-center gap-3 shrink-0">
+            {/* Metric vs Imperial Toggle (Metric default) */}
+            <div
+              role="group"
+              aria-label="Measurement unit system"
+              className="flex items-center gap-1 p-1 bg-[#F1EFE9] border border-[#E6E3DC] rounded-lg"
+            >
+              <button
+                type="button"
+                onClick={() => onChangeUnitSystem('metric')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                  unitSystem === 'metric'
+                    ? 'bg-white text-[#1A1917] shadow-xs'
+                    : 'text-[#64615B] hover:text-[#1A1917]'
+                }`}
+              >
+                Metric (m / m²)
+              </button>
+              <button
+                type="button"
+                onClick={() => onChangeUnitSystem('imperial')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                  unitSystem === 'imperial'
+                    ? 'bg-white text-[#1A1917] shadow-xs'
+                    : 'text-[#64615B] hover:text-[#1A1917]'
+                }`}
+              >
+                Imperial (ft / sq ft)
+              </button>
+            </div>
+
             <button
               type="button"
               onClick={loadSampleFloorPlan}
@@ -164,17 +262,19 @@ export const SpaceUploadStage: React.FC<SpaceUploadStageProps> = ({
 
         {/* Two-Column Balanced Workspace */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Left Column (7 cols): Floor Plan Upload & Dimension Calibration */}
+          {/* Left Column (7 cols): Floor Plan Wall & Scale Bar Scanner */}
           <div className="lg:col-span-7 bg-white border border-[#E6E3DC] rounded-xl p-6">
             <div className="flex flex-wrap items-center justify-between gap-4 mb-5">
               <div>
-                <h2 className="font-display text-lg font-semibold text-[#1A1917]">
-                  Architectural Floor Plan
-                </h2>
+                <h3 className="font-display text-lg font-semibold text-[#1A1917]">
+                  Architectural Floor Plan &amp; Wall Scan
+                </h3>
                 <p className="text-sm text-[#64615B]">
-                  {room.widthFt} ft × {room.lengthFt} ft ·{' '}
-                  <span className="font-mono tabular-nums text-[#1A1917]">{areaSqFt} sq ft</span> ·{' '}
-                  {room.heightFt} ft ceiling
+                  {formatLength(room.widthFt, unitSystem)} × {formatLength(room.lengthFt, unitSystem)} ·{' '}
+                  <span className="font-mono tabular-nums text-[#1A1917]">
+                    {formatArea(areaSqFt, unitSystem)}
+                  </span>{' '}
+                  · {formatLength(room.heightFt, unitSystem)} ceiling
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -189,7 +289,7 @@ export const SpaceUploadStage: React.FC<SpaceUploadStageProps> = ({
                     }`}
                   >
                     <Layers className="w-3.5 h-3.5" />
-                    {showZoneOverlay ? 'Hide Wall Scan' : 'Show Wall Scan'}
+                    {showZoneOverlay ? 'Hide Scan Overlay' : 'Show Scan Overlay'}
                   </button>
                 )}
                 <button
@@ -198,7 +298,7 @@ export const SpaceUploadStage: React.FC<SpaceUploadStageProps> = ({
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#1A1917] bg-[#F1EFE9] hover:bg-[#E6E3DC] rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                 >
                   <Upload className="w-3.5 h-3.5" />
-                  {room.floorPlanUrl ? 'Replace Plan' : 'Upload Plan'}
+                  {room.floorPlanUrl ? 'Upload New Plan' : 'Upload Plan'}
                 </button>
               </div>
             </div>
@@ -242,37 +342,71 @@ export const SpaceUploadStage: React.FC<SpaceUploadStageProps> = ({
                     referrerPolicy="no-referrer"
                     className="w-full h-full object-contain"
                   />
-                  {/* Canvas-analyzed structural zone grid overlay */}
+
+                  {/* Scanned Enclosure, Interior Walls & Graphic Scale Bar SVG Overlay */}
                   {showZoneOverlay && room.floorPlanAnalysis && (
-                    <div
+                    <svg
+                      viewBox="0 0 100 100"
+                      preserveAspectRatio="none"
                       aria-hidden="true"
-                      className="absolute inset-0 grid grid-cols-8 grid-rows-6 pointer-events-none"
+                      className="absolute inset-0 w-full h-full pointer-events-none"
                     >
-                      {room.floorPlanAnalysis.zoneGrid.flatMap((row, rIdx) =>
-                        row.map((density, cIdx) => (
-                          <div
-                            key={`${rIdx}-${cIdx}`}
-                            className="border border-[#1B4D3E]/15"
-                            style={{
-                              backgroundColor:
-                                density > 0.25
-                                  ? `rgba(27, 77, 62, ${Math.min(0.28, density * 0.45)})`
-                                  : 'transparent',
-                            }}
+                      {/* Detected room perimeter enclosure */}
+                      <rect
+                        x={room.floorPlanAnalysis.wallBounds.x * 100}
+                        y={room.floorPlanAnalysis.wallBounds.y * 100}
+                        width={room.floorPlanAnalysis.wallBounds.w * 100}
+                        height={room.floorPlanAnalysis.wallBounds.h * 100}
+                        fill="rgba(27, 77, 62, 0.06)"
+                        stroke="#1B4D3E"
+                        strokeWidth="0.6"
+                        strokeDasharray="2 1"
+                      />
+
+                      {/* Detected interior structural wall segments */}
+                      {room.floorPlanAnalysis.detectedWalls.map((seg, idx) => {
+                        const wb = room.floorPlanAnalysis!.wallBounds;
+                        const x1 = (wb.x + seg.x1 * wb.w) * 100;
+                        const y1 = (wb.y + seg.y1 * wb.h) * 100;
+                        const x2 = (wb.x + seg.x2 * wb.w) * 100;
+                        const y2 = (wb.y + seg.y2 * wb.h) * 100;
+                        return (
+                          <line
+                            key={idx}
+                            x1={x1}
+                            y1={y1}
+                            x2={x2}
+                            y2={y2}
+                            stroke="#1B4D3E"
+                            strokeWidth="1.2"
                           />
-                        )),
+                        );
+                      })}
+
+                      {/* Detected graphic scale bar highlight */}
+                      {room.floorPlanAnalysis.scaleBarBounds && (
+                        <rect
+                          x={room.floorPlanAnalysis.scaleBarBounds.x * 100}
+                          y={room.floorPlanAnalysis.scaleBarBounds.y * 100}
+                          width={room.floorPlanAnalysis.scaleBarBounds.w * 100}
+                          height={room.floorPlanAnalysis.scaleBarBounds.h * 100}
+                          fill="rgba(217, 119, 6, 0.18)"
+                          stroke="#D97706"
+                          strokeWidth="0.6"
+                        />
                       )}
-                    </div>
+                    </svg>
                   )}
-                  <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between gap-4 px-3 py-2 bg-[#1A1917]/90 text-white text-xs rounded-lg">
+
+                  <div className="absolute bottom-3 left-3 right-3 flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-[#1A1917]/92 text-white text-xs rounded-lg">
                     <span className="truncate font-medium">
                       {room.floorPlanName ?? 'Floor Plan Loaded'}
                     </span>
                     <span className="font-mono tabular-nums text-[#D4CFC4] shrink-0">
                       {analyzingPlan
-                        ? 'Scanning walls...'
+                        ? 'Scanning walls & scale bar...'
                         : room.floorPlanAnalysis
-                          ? `Ratio ${room.floorPlanAnalysis.aspectRatio}:1 · ${room.floorPlanAnalysis.openingsDetected} openings`
+                          ? `${room.floorPlanAnalysis.scaleLabel} · ${room.floorPlanAnalysis.openingsDetected} openings`
                           : 'Calibrated'}
                     </span>
                   </div>
@@ -288,7 +422,7 @@ export const SpaceUploadStage: React.FC<SpaceUploadStageProps> = ({
                     Drop a 2D floor plan image or click to browse
                   </p>
                   <p className="text-xs text-[#64615B]">
-                    Supports PNG, JPG, WEBP, or blueprint sketches — or click Load Sample Plan above
+                    Automatically scans walls, graphic scale bars &amp; openings and regenerates the 3D model
                   </p>
                 </button>
               )}
@@ -298,68 +432,140 @@ export const SpaceUploadStage: React.FC<SpaceUploadStageProps> = ({
               <p className="mt-2 text-xs text-[#B91C1C] font-medium">{planError}</p>
             )}
 
-            {/* Spatial Dimension & Layout Controls */}
+            {regeneratedBanner && (
+              <div className="mt-3 px-3.5 py-2 rounded-lg bg-[#1B4D3E]/8 border border-[#1B4D3E]/25 flex flex-wrap items-center justify-between gap-3 text-xs">
+                <span className="inline-flex items-center gap-1.5 font-medium text-[#1B4D3E]">
+                  <Check className="w-3.5 h-3.5" />
+                  {regeneratedBanner}
+                </span>
+                <button
+                  type="button"
+                  onClick={onJumpTo3D}
+                  className="inline-flex items-center gap-1 font-semibold text-[#1B4D3E] hover:underline cursor-pointer"
+                >
+                  <Box className="w-3.5 h-3.5" />
+                  Inspect 3D Model
+                </button>
+              </div>
+            )}
+
+            {/* Scale Bar Calibration Control (shown when scale bar detected) */}
+            {room.floorPlanAnalysis?.scaleBarDetected && (
+              <div className="mt-4 px-3.5 py-2.5 rounded-lg bg-[#FAF9F6] border border-[#E6E3DC] flex flex-wrap items-center justify-between gap-3 text-xs">
+                <span className="inline-flex items-center gap-1.5 text-[#1A1917] font-medium">
+                  <Ruler className="w-3.5 h-3.5 text-[#D97706]" />
+                  Scale Bar Reference Length
+                </span>
+                <div className="flex items-center gap-2">
+                  {[2.0, 3.0, 4.0, 5.0].map((mVal) => (
+                    <button
+                      key={mVal}
+                      type="button"
+                      onClick={() => void handleRecalibrateScaleBar(mVal)}
+                      className={`px-2.5 py-1 rounded border text-xs font-mono tabular-nums cursor-pointer transition-colors ${
+                        scaleReferenceMeters === mVal
+                          ? 'bg-[#1A1917] text-white border-[#1A1917]'
+                          : 'bg-white text-[#1A1917] border-[#DCD8CF] hover:bg-[#F1EFE9]'
+                      }`}
+                    >
+                      {unitSystem === 'metric'
+                        ? `${mVal.toFixed(1)} m`
+                        : `${(mVal * M_TO_FT).toFixed(0)} ft`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Spatial Dimension & Explicit Ceiling Height Inputs */}
             <div className="mt-6 pt-5 border-t border-[#E6E3DC]">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
                 <label className="block">
                   <span className="flex items-center justify-between text-xs font-medium text-[#64615B] mb-1.5">
-                    <span>Room Length</span>
-                    <span className="font-mono tabular-nums text-[#1A1917]">{room.lengthFt} ft</span>
+                    <span>Room Length ({unitSystem === 'metric' ? 'm' : 'ft'})</span>
+                    <span className="font-mono tabular-nums text-[#1A1917]">
+                      {displayLength} {unitSystem === 'metric' ? 'm' : 'ft'}
+                    </span>
                   </span>
-                  <input
-                    type="range"
-                    min={14}
-                    max={34}
-                    step={1}
-                    value={room.lengthFt}
-                    onChange={(e) =>
-                      onChangeRoom((prev) => ({
-                        ...prev,
-                        lengthFt: Number(e.target.value),
-                      }))
-                    }
-                    className="w-full accent-[#1B4D3E] cursor-pointer"
-                  />
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={unitSystem === 'metric' ? 4.0 : 13}
+                      max={unitSystem === 'metric' ? 11.0 : 36}
+                      step={unitSystem === 'metric' ? 0.1 : 0.5}
+                      value={displayLength}
+                      onChange={(e) => updateDimension('lengthFt', Number(e.target.value))}
+                      className="w-20 px-2.5 py-1.5 text-xs font-mono tabular-nums bg-white border border-[#DCD8CF] rounded-md text-[#1A1917] focus:outline-none focus:border-[#1B4D3E]"
+                    />
+                    <input
+                      type="range"
+                      min={unitSystem === 'metric' ? 4.0 : 13}
+                      max={unitSystem === 'metric' ? 11.0 : 36}
+                      step={unitSystem === 'metric' ? 0.1 : 0.5}
+                      value={displayLength}
+                      onChange={(e) => updateDimension('lengthFt', Number(e.target.value))}
+                      className="flex-1 accent-[#1B4D3E] cursor-pointer"
+                    />
+                  </div>
                 </label>
+
                 <label className="block">
                   <span className="flex items-center justify-between text-xs font-medium text-[#64615B] mb-1.5">
-                    <span>Room Width</span>
-                    <span className="font-mono tabular-nums text-[#1A1917]">{room.widthFt} ft</span>
+                    <span>Room Width ({unitSystem === 'metric' ? 'm' : 'ft'})</span>
+                    <span className="font-mono tabular-nums text-[#1A1917]">
+                      {displayWidth} {unitSystem === 'metric' ? 'm' : 'ft'}
+                    </span>
                   </span>
-                  <input
-                    type="range"
-                    min={12}
-                    max={26}
-                    step={1}
-                    value={room.widthFt}
-                    onChange={(e) =>
-                      onChangeRoom((prev) => ({
-                        ...prev,
-                        widthFt: Number(e.target.value),
-                      }))
-                    }
-                    className="w-full accent-[#1B4D3E] cursor-pointer"
-                  />
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={unitSystem === 'metric' ? 3.4 : 11}
+                      max={unitSystem === 'metric' ? 8.5 : 28}
+                      step={unitSystem === 'metric' ? 0.1 : 0.5}
+                      value={displayWidth}
+                      onChange={(e) => updateDimension('widthFt', Number(e.target.value))}
+                      className="w-20 px-2.5 py-1.5 text-xs font-mono tabular-nums bg-white border border-[#DCD8CF] rounded-md text-[#1A1917] focus:outline-none focus:border-[#1B4D3E]"
+                    />
+                    <input
+                      type="range"
+                      min={unitSystem === 'metric' ? 3.4 : 11}
+                      max={unitSystem === 'metric' ? 8.5 : 28}
+                      step={unitSystem === 'metric' ? 0.1 : 0.5}
+                      value={displayWidth}
+                      onChange={(e) => updateDimension('widthFt', Number(e.target.value))}
+                      className="flex-1 accent-[#1B4D3E] cursor-pointer"
+                    />
+                  </div>
                 </label>
+
                 <label className="block">
-                  <span className="flex items-center justify-between text-xs font-medium text-[#64615B] mb-1.5">
-                    <span>Ceiling Height</span>
-                    <span className="font-mono tabular-nums text-[#1A1917]">{room.heightFt} ft</span>
+                  <span className="flex items-center justify-between text-xs font-medium text-[#1A1917] mb-1.5">
+                    <span>Ceiling Height ({unitSystem === 'metric' ? 'm' : 'ft'})</span>
+                    <span className="font-mono tabular-nums text-[#1B4D3E] font-semibold">
+                      {displayHeight} {unitSystem === 'metric' ? 'm' : 'ft'}
+                    </span>
                   </span>
-                  <input
-                    type="range"
-                    min={8}
-                    max={13}
-                    step={0.5}
-                    value={room.heightFt}
-                    onChange={(e) =>
-                      onChangeRoom((prev) => ({
-                        ...prev,
-                        heightFt: Number(e.target.value),
-                      }))
-                    }
-                    className="w-full accent-[#1B4D3E] cursor-pointer"
-                  />
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      aria-label="Ceiling height"
+                      min={unitSystem === 'metric' ? 2.4 : 8.0}
+                      max={unitSystem === 'metric' ? 4.2 : 14.0}
+                      step={unitSystem === 'metric' ? 0.1 : 0.5}
+                      value={displayHeight}
+                      onChange={(e) => updateDimension('heightFt', Number(e.target.value))}
+                      className="w-20 px-2.5 py-1.5 text-xs font-mono tabular-nums bg-white border border-[#1B4D3E]/50 rounded-md text-[#1A1917] focus:outline-none focus:border-[#1B4D3E]"
+                    />
+                    <input
+                      type="range"
+                      min={unitSystem === 'metric' ? 2.4 : 8.0}
+                      max={unitSystem === 'metric' ? 4.2 : 14.0}
+                      step={unitSystem === 'metric' ? 0.1 : 0.5}
+                      value={displayHeight}
+                      onChange={(e) => updateDimension('heightFt', Number(e.target.value))}
+                      className="flex-1 accent-[#1B4D3E] cursor-pointer"
+                    />
+                  </div>
                 </label>
               </div>
 
@@ -416,7 +622,7 @@ export const SpaceUploadStage: React.FC<SpaceUploadStageProps> = ({
                       }
                       className="rounded border-[#DCD8CF] accent-[#1B4D3E]"
                     />
-                    <span>Partition Wall</span>
+                    <span>Scanned Partition Walls</span>
                   </label>
                 </div>
               </div>
@@ -427,9 +633,9 @@ export const SpaceUploadStage: React.FC<SpaceUploadStageProps> = ({
           <div className="lg:col-span-5 bg-white border border-[#E6E3DC] rounded-xl p-6">
             <div className="flex items-center justify-between gap-4 mb-5">
               <div>
-                <h2 className="font-display text-lg font-semibold text-[#1A1917]">
+                <h3 className="font-display text-lg font-semibold text-[#1A1917]">
                   Existing Space Photos
-                </h2>
+                </h3>
                 <p className="text-sm text-[#64615B]">
                   {room.photos.length} {room.photos.length === 1 ? 'photo' : 'photos'} uploaded · Auto-extracts palette
                 </p>
@@ -484,7 +690,7 @@ export const SpaceUploadStage: React.FC<SpaceUploadStageProps> = ({
                     Drop photos of your current room
                   </p>
                   <p className="text-xs text-[#64615B]">
-                    Up to 6 reference angles for existing tone & daylight analysis
+                    Up to 6 reference angles for existing tone &amp; daylight analysis
                   </p>
                 </button>
               ) : (
@@ -545,10 +751,10 @@ export const SpaceUploadStage: React.FC<SpaceUploadStageProps> = ({
             <div className="mt-5 pt-4 border-t border-[#E6E3DC] flex items-center justify-between text-xs text-[#64615B]">
               <span className="inline-flex items-center gap-1.5 text-[#1B4D3E] font-medium">
                 <Check className="w-3.5 h-3.5" />
-                Synced to 3D Studio & Estimator
+                Synced to 3D Studio &amp; Estimator
               </span>
               <span className="font-mono tabular-nums">
-                {Math.round(room.widthFt * room.lengthFt)} SF · {2 * (room.widthFt + room.lengthFt)} LF
+                {formatArea(areaSqFt, unitSystem)} · {formatLength(2 * (room.widthFt + room.lengthFt), unitSystem)} perim
               </span>
             </div>
           </div>

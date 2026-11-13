@@ -3,10 +3,11 @@ import React from 'react';
 interface TopBarProps {
   activeSection: string;
   onNavigate: (sectionId: string) => void;
-  onOpenExport: () => void;
+  onOpenQuotation: () => void;
 }
 
 const NAV_ITEMS = [
+  { id: 'overview', label: 'Overview' },
   { id: 'space', label: 'Space & Plan' },
   { id: 'moodboard', label: 'Mood Board' },
   { id: 'studio3d', label: '3D Studio' },
@@ -16,27 +17,27 @@ const NAV_ITEMS = [
 export const TopBar: React.FC<TopBarProps> = ({
   activeSection,
   onNavigate,
-  onOpenExport,
+  onOpenQuotation,
 }) => {
   return (
     <header className="sticky top-0 z-40 bg-[#F8F7F4]/95 border-b border-[#E6E3DC]">
       <div className="max-w-[1360px] mx-auto px-6 h-16 flex items-center justify-between gap-8">
         {/* Zone 1: Single-element Brand Wordmark */}
         <a
-          href="#space"
+          href="#overview"
           onClick={(e) => {
             e.preventDefault();
-            onNavigate('space');
+            onNavigate('overview');
           }}
           className="font-display text-lg font-bold tracking-tight text-[#1A1917] whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1B4D3E]"
         >
           Atelier Spatial
         </a>
 
-        {/* Zone 2: Concise single-line navigation links */}
+        {/* Zone 2: 5 concise single-line navigation links */}
         <nav
           aria-label="Primary studio workflow"
-          className="hidden md:flex items-center gap-7"
+          className="hidden md:flex items-center gap-6"
         >
           {NAV_ITEMS.map((item) => {
             const isActive = activeSection === item.id;
@@ -64,10 +65,10 @@ export const TopBar: React.FC<TopBarProps> = ({
         <div className="flex items-center shrink-0">
           <button
             type="button"
-            onClick={onOpenExport}
+            onClick={onOpenQuotation}
             className="px-4 py-2 text-sm font-medium text-white bg-[#1B4D3E] hover:bg-[#153D31] rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1B4D3E]"
           >
-            Export Brief
+            1-Click Quote
           </button>
         </div>
       </div>
