@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Check, CheckCircle2, Copy, Download, Send, X } from 'lucide-react';
+import { Check, CheckCircle2, Copy, Download, FileDown, Send, X } from 'lucide-react';
 import { CONTRACTORS_DIRECTORY } from '../data/contractors';
 import {
   ColorScheme,
@@ -21,6 +21,8 @@ interface QuotationModalProps {
   pinnedPhotos: MoodBoardPhoto[];
   estimate: CostEstimate;
   shortlistedContractorIds: string[];
+  onExportPdf: (opts?: { propertyType?: string; postalDistrict?: string }) => Promise<void>;
+  exportingPdf?: boolean;
 }
 
 export const QuotationModal: React.FC<QuotationModalProps> = ({
@@ -33,6 +35,8 @@ export const QuotationModal: React.FC<QuotationModalProps> = ({
   pinnedPhotos,
   estimate,
   shortlistedContractorIds,
+  onExportPdf,
+  exportingPdf = false,
 }) => {
   const [propertyType, setPropertyType] = useState<'HDB BTO / Resale' | 'Condominium' | 'Landed'>('HDB BTO / Resale');
   const [contactEmail, setContactEmail] = useState('');
@@ -148,7 +152,7 @@ export const QuotationModal: React.FC<QuotationModalProps> = ({
               1-Click Singapore Renovation Quotation
             </h2>
             <p className="text-xs text-[#64615B]">
-              Bundles your floor plan, {style.name} palette, and SGD scope for matched pros
+              Bundles your floor plan, 3D screenshots, {style.name} mood board, and SGD scope
             </p>
           </div>
           <button
@@ -297,7 +301,21 @@ export const QuotationModal: React.FC<QuotationModalProps> = ({
         </div>
 
         <div className="px-6 py-4 bg-[#FAF9F6] border-t border-[#E6E3DC] flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={exportingPdf}
+              onClick={() =>
+                void onExportPdf({
+                  propertyType,
+                  postalDistrict: postalDistrict.trim() || undefined,
+                })
+              }
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-[#1B4D3E] bg-[#1B4D3E]/10 border border-[#1B4D3E]/30 hover:bg-[#1B4D3E]/15 disabled:opacity-60 rounded-lg transition-colors cursor-pointer"
+            >
+              <FileDown className="w-3.5 h-3.5" />
+              {exportingPdf ? 'Generating PDF...' : 'Export PDF Brief'}
+            </button>
             <button
               type="button"
               onClick={handleCopySummary}

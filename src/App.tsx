@@ -3,12 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { TopBar } from './components/TopBar';
 import { LandingSection } from './components/LandingSection';
 import { SpaceUploadStage } from './components/SpaceUploadStage';
 import { MoodBoardStage } from './components/MoodBoardStage';
-import { Studio3DViewport } from './components/Studio3DViewport';
+import { Studio3DViewport, Studio3DViewportHandle } from './components/Studio3DViewport';
 import { EstimatorContractorsStage } from './components/EstimatorContractorsStage';
 import { QuotationModal } from './components/QuotationModal';
 import { DESIGN_STYLES, SAMPLE_FLOOR_PLAN_IMAGE, getStyleById } from './data/styles';
@@ -24,6 +24,7 @@ import {
   DEFAULT_RENOVATION_SCOPE,
 } from './utils/costCalculator';
 import { analyzeFloorPlanImage } from './utils/imageAnalysis';
+import { exportDesignBriefPdf } from './utils/pdfBriefExport';
 
 const INITIAL_ROOM: RoomConfig = {
   roomName: 'HDB 5-Room Flat (110 m²)',
@@ -59,7 +60,9 @@ export default function App() {
   const [shortlistedContractorIds, setShortlistedContractorIds] = useState<string[]>([
     'kobo-sg',
   ]);
+  const studio3dRef = useRef<Studio3DViewportHandle>(null);
   const [quoteModalOpen, setQuoteModalOpen] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   const selectedStyle = useMemo(
     () => getStyleById(selectedStyleId),
@@ -111,6 +114,31 @@ export default function App() {
     const el = document.getElementById(sectionId);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const handleExportPdf = async (opts?: {
+    propertyType?: string;
+    postalDistrict?: string;
+  }) => {
+    if (exportingPdf) return;
+    setExportingPdf(true);
+    try {
+      const snapshots = studio3dRef.current?.captureBriefSnapshots() ?? null;
+      await exportDesignBriefPdf({
+        room,
+        unitSystem,
+        style: selectedStyle,
+        scheme: selectedScheme,
+        pinnedPhotos,
+        estimate,
+        shortlistedContractorIds,
+        snapshots,
+        propertyType: opts?.propertyType,
+        postalDistrict: opts?.postalDistrict,
+      });
+    } finally {
+      setExportingPdf(false);
     }
   };
 
@@ -194,11 +222,14 @@ export default function App() {
         />
 
         <Studio3DViewport
+          ref={studio3dRef}
           room={room}
           unitSystem={unitSystem}
           selectedStyle={selectedStyle}
           selectedScheme={selectedScheme}
           onSelectStyle={handleSelectStyle}
+          onExportPdf={() => handleExportPdf()}
+          exportingPdf={exportingPdf}
         />
 
         <EstimatorContractorsStage
@@ -212,6 +243,8 @@ export default function App() {
           onToggleScopeItem={handleToggleScopeItem}
           onToggleShortlist={handleToggleShortlist}
           onOneClickQuote={() => setQuoteModalOpen(true)}
+          onExportPdf={() => handleExportPdf()}
+          exportingPdf={exportingPdf}
         />
       </main>
 
@@ -227,6 +260,13 @@ export default function App() {
               className="hover:text-[#1A1917] cursor-pointer"
             >
               Back to Top
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleExportPdf()}
+              className="hover:text-[#1A1917] cursor-pointer"
+            >
+              Export PDF Brief
             </button>
             <button
               type="button"
@@ -249,6 +289,8 @@ export default function App() {
         pinnedPhotos={pinnedPhotos}
         estimate={estimate}
         shortlistedContractorIds={shortlistedContractorIds}
+        onExportPdf={handleExportPdf}
+        exportingPdf={exportingPdf}
       />
     </div>
   );

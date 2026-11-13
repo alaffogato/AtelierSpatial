@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Check, ExternalLink, FileCheck2, Star } from 'lucide-react';
+import { Check, ExternalLink, FileCheck2, FileDown, Star } from 'lucide-react';
 import { CONTRACTORS_DIRECTORY } from '../data/contractors';
 import {
   ColorScheme,
@@ -23,6 +23,8 @@ interface EstimatorContractorsStageProps {
   onToggleScopeItem: (id: string) => void;
   onToggleShortlist: (id: string) => void;
   onOneClickQuote: () => void;
+  onExportPdf: () => Promise<void>;
+  exportingPdf?: boolean;
 }
 
 const SPECIALTY_FILTERS: Array<'All' | ContractorProfile['specialty']> = [
@@ -48,6 +50,8 @@ export const EstimatorContractorsStage: React.FC<EstimatorContractorsStageProps>
   onToggleScopeItem,
   onToggleShortlist,
   onOneClickQuote,
+  onExportPdf,
+  exportingPdf = false,
 }) => {
   const [specialtyFilter, setSpecialtyFilter] = useState<'All' | ContractorProfile['specialty']>('All');
 
@@ -88,6 +92,15 @@ export const EstimatorContractorsStage: React.FC<EstimatorContractorsStageProps>
                 {formatSGD(estimate.estimatedLow)} – {formatSGD(estimate.estimatedHigh)}
               </p>
             </div>
+            <button
+              type="button"
+              disabled={exportingPdf}
+              onClick={() => void onExportPdf()}
+              className="inline-flex items-center gap-2 px-4 py-3.5 text-sm font-medium text-[#1A1917] bg-white border border-[#DCD8CF] hover:bg-[#F1EFE9] disabled:opacity-60 rounded-xl transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            >
+              <FileDown className="w-4 h-4 text-[#1B4D3E]" />
+              {exportingPdf ? 'Generating PDF...' : 'Export PDF Brief'}
+            </button>
             <button
               type="button"
               onClick={onOneClickQuote}

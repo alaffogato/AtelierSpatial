@@ -1,10 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import {
   Camera,
   ChevronDown,
   ChevronUp,
   Compass,
   Eye,
+  FileDown,
   Footprints,
   RotateCcw,
   Sun,
@@ -16,7 +17,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { DESIGN_STYLES } from '../data/styles';
-import { RoomSceneEngine } from '../three/RoomSceneEngine';
+import { RoomSceneEngine, StudioBriefSnapshots } from '../three/RoomSceneEngine';
 import {
   CameraMode,
   CameraPreset,
@@ -29,23 +30,35 @@ import {
 } from '../types/design';
 import { formatLength } from '../utils/units';
 
+export interface Studio3DViewportHandle {
+  captureBriefSnapshots: () => StudioBriefSnapshots | null;
+}
+
 interface Studio3DViewportProps {
   room: RoomConfig;
   unitSystem: UnitSystem;
   selectedStyle: StyleDefinition;
   selectedScheme: ColorScheme;
   onSelectStyle: (styleId: DesignStyleId) => void;
+  onExportPdf?: () => Promise<void>;
+  exportingPdf?: boolean;
 }
 
-export const Studio3DViewport: React.FC<Studio3DViewportProps> = ({
+export const Studio3DViewport = forwardRef<Studio3DViewportHandle, Studio3DViewportProps>(({
   room,
   unitSystem,
   selectedStyle,
   selectedScheme,
   onSelectStyle,
-}) => {
+  onExportPdf,
+  exportingPdf = false,
+}, ref) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const engineRef = useRef<RoomSceneEngine | null>(null);
+
+  useImperativeHandle(ref, () => ({
+    captureBriefSnapshots: () => engineRef.current?.captureBriefSnapshots() ?? null,
+  }), []);
 
   const [cameraMode, setCameraMode] = useState<CameraMode>('orbit');
   const [lightingMood, setLightingMood] = useState<LightingMood>('daylight');
@@ -158,7 +171,7 @@ export const Studio3DViewport: React.FC<Studio3DViewportProps> = ({
             </p>
           </div>
 
-          {/* Top-Right Snapshot Action */}
+          {/* Top-Right Snapshot & Export PDF Actions */}
           <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
             {snapshotNotice && (
               <span className="px-3 py-1.5 text-xs font-medium text-white bg-[#1B4D3E] rounded-lg">
@@ -173,6 +186,17 @@ export const Studio3DViewport: React.FC<Studio3DViewportProps> = ({
               <Camera className="w-3.5 h-3.5" />
               Snapshot
             </button>
+            {onExportPdf && (
+              <button
+                type="button"
+                disabled={exportingPdf}
+                onClick={() => void onExportPdf()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-[#1B4D3E]/95 hover:bg-[#153D31] disabled:opacity-60 border border-white/15 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              >
+                <FileDown className="w-3.5 h-3.5" />
+                {exportingPdf ? 'Exporting...' : 'Export PDF'}
+              </button>
+            )}
           </div>
 
           {/* Walkthrough Touch / Click Navigation Pad (only in Walkthrough mode) */}
@@ -361,4 +385,6 @@ export const Studio3DViewport: React.FC<Studio3DViewportProps> = ({
       </div>
     </section>
   );
-};
+});
+
+Studio3DViewport.displayName = 'Studio3DViewport';

@@ -43,6 +43,13 @@ const _targetPos = new THREE.Vector3();
 const _targetLook = new THREE.Vector3();
 const _euler = new THREE.Euler(0, 0, 0, 'YXZ');
 
+export interface StudioBriefSnapshots {
+  aspectRatio: number;
+  activeViewDataUrl: string;
+  isometricDataUrl: string;
+  topPlanDataUrl: string;
+}
+
 export interface SceneCallbacks {
   onContextLost?: (lost: boolean) => void;
   onModeChange?: (mode: CameraMode) => void;
@@ -1133,6 +1140,59 @@ export class RoomSceneEngine {
   public captureSnapshot(): string {
     this.renderer.render(this.scene, this.camera);
     return this.renderer.domElement.toDataURL('image/png');
+  }
+
+  public captureBriefSnapshots(): StudioBriefSnapshots {
+    const aspectRatio =
+      this.renderer.domElement.width / Math.max(1, this.renderer.domElement.height);
+
+    // 1. Capture user's current active 3D perspective
+    this.renderer.render(this.scene, this.camera);
+    const activeViewDataUrl = this.renderer.domElement.toDataURL('image/png');
+
+    // Temporarily hide ceiling for cutaway architectural clarity
+    const prevCeilingVisible = this.ceilingMesh ? this.ceilingMesh.visible : false;
+    if (this.ceilingMesh) this.ceilingMesh.visible = false;
+
+    const snapCam = new THREE.PerspectiveCamera(this.camera.fov, aspectRatio, 0.1, 80);
+
+    // 2. Capture Isometric Architectural Cutaway View
+    if (this.currentLayoutPreset === 'hdb-5-room') {
+      snapCam.position.set(
+        -this.roomWidthM * 0.52,
+        Math.max(8.6, this.roomWidthM * 0.8),
+        this.roomLengthM * 0.92,
+      );
+      snapCam.lookAt(0, 0.65, 0);
+    } else {
+      snapCam.position.set(this.roomWidthM * 0.78, 5.2, this.roomLengthM * 1.15);
+      snapCam.lookAt(0, 0.85, 0);
+    }
+    snapCam.updateMatrixWorld();
+    this.renderer.render(this.scene, snapCam);
+    const isometricDataUrl = this.renderer.domElement.toDataURL('image/png');
+
+    // 3. Capture Top-Down 3D Plan View
+    snapCam.position.set(
+      0,
+      Math.max(8.5, Math.max(this.roomWidthM, this.roomLengthM) * 1.18),
+      0.01,
+    );
+    snapCam.lookAt(0, 0, 0);
+    snapCam.updateMatrixWorld();
+    this.renderer.render(this.scene, snapCam);
+    const topPlanDataUrl = this.renderer.domElement.toDataURL('image/png');
+
+    // Restore live viewport state immediately
+    if (this.ceilingMesh) this.ceilingMesh.visible = prevCeilingVisible;
+    this.renderer.render(this.scene, this.camera);
+
+    return {
+      aspectRatio,
+      activeViewDataUrl,
+      isometricDataUrl,
+      topPlanDataUrl,
+    };
   }
 
   private afterDraw(cb: () => void) {
